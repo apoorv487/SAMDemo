@@ -1,0 +1,11 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "SAMDemo"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-14nyuk7uyhvlc"
+s3_prefix = "SAMDemo"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "ApiGatewayStageName=\"v2\""

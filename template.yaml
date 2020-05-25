@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAMDemo
+
+  Sample SAM Template for SAMDemo
+
+
+Parameters:
+  ApiGatewayStageName:
+    Default: v1  
+    Description : Stage name for the API Gateway
+    Type: String 
+
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+
+  DemoGetUserIdApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      ApiKeySourceType: HEADER
+      Description: An API Gateway with a Lambda Integration
+      Name: get-user-api
+      
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt DemoGetUserIdApi.RootResourceId
+      PathPart: '{userId}'
+      RestApiId: !Ref DemoGetUserIdApi
+
+  ApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      RequestParameters:
+        method.request.path.userId: true
+      Integration:
+        Credentials: !GetAtt ApiGatewayIamRole.Arn
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: {"application/json": ""}
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates: 
+          application/json: "{ \"userId\": \"$input.params('userId')\", \"showId\": \"$input.params('name')\"}"
+        TimeoutInMillis: 29000
+        Type: AWS
+        # RequestParameters:
+        #   integration.request.path.userId: method.request.path.userId
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt "DemoGetDetailsFunction.Arn"
+      MethodResponses: 
+        - ResponseModels: 
+            application/json : 'Empty'
+          ResponseParameters: 
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200  
+      OperationName: 'friendly operation name'
+      ResourceId: !Ref ApiGatewayResource
+      RestApiId: !Ref DemoGetUserIdApi
+
+  ApiGatewayModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref DemoGetUserIdApi
+      Schema: {}
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ApiGatewayMethod
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref DemoGetUserIdApi
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      Description: Lambda API Stage
+      RestApiId: !Ref DemoGetUserIdApi
+      StageName: !Ref ApiGatewayStageName
+
+  ApiGatewayIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ''
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'apigateway.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+
+  ApiGatewayPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: "LambdaAccess"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        -
+          Effect: 'Allow'
+          Action: 'lambda:*'
+          Resource: !GetAtt DemoGetDetailsFunction.Arn
+      Roles: 
+      - 
+        !Ref ApiGatewayIamRole
+
+  DemoGetDetailsFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: demo-get-details/
+      Handler: app.lambdaHandler
+      Role: !GetAtt LambdaIamRole.Arn
+      Runtime: nodejs12.x
+      Timeout: 90
+
+  LambdaIamRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/"
+
+  LambdaApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt "DemoGetDetailsFunction.Arn"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DemoGetUserIdApi}/*/*
+
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  
+  DemoGetUserIdApi:
+    Description: "API Gateway endpoint URL for Prod stage for Get Details Function"
+    Value: !Sub "https://${DemoGetUserIdApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStageName}/{userId}"
+  DemoGetDetailsFunction:
+    Description: "Get Details Function ARN"
+    Value: !GetAtt DemoGetDetailsFunction.Arn
+  LambdaIamRole:
+    Description: "IAM Role created for Lambda"
+    Value: !GetAtt LambdaIamRole.Arn
+  ApiGatewayIamRole:
+    Description: "IAM Role created for API Gateway"
+    Value: !GetAtt ApiGatewayIamRole.Arn
+  
+  
+  
+  
+  
