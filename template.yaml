@@ -55,7 +55,7 @@ Resources:
             StatusCode: 200
         PassthroughBehavior: WHEN_NO_TEMPLATES
         RequestTemplates: 
-          application/json: "{ \"userId\": \"$input.params('userId')\", \"showId\": \"$input.params('name')\"}"
+          application/json: "{ \"userId\": \"$input.params('userId')\", \"firstName\": \"$input.params('firstName')\"}"
         TimeoutInMillis: 29000
         Type: AWS
         # RequestParameters:
